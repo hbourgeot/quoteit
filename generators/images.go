@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
+	"golang.org/x/image/font"
 	"image"
 	"image/color"
 	"image/draw"
@@ -14,26 +15,86 @@ import (
 	"strings"
 )
 
-func LoadFont(variant string) (*truetype.Font, error) {
+func wrapText(text string, maxWidth int, face font.Face) []string {
+	var lines []string
+	var line string
+
+	words := strings.Fields(text)
+	spaceWidth := font.MeasureString(face, " ").Round()
+
+	for _, word := range words {
+		// Medir el ancho del word actual
+		lineWidth := font.MeasureString(face, line+word).Round()
+
+		if len(line)+len(word)+1 > maxWidth && line != "" {
+			lines = append(lines, line)
+			line = word // Comienza una nueva línea
+		} else {
+			if line != "" {
+				line += " "
+				lineWidth += spaceWidth
+			}
+			line += word
+		}
+	}
+
+	if line != "" {
+		lines = append(lines, line)
+	}
+
+	return lines
+}
+
+func roundProfileImage(src image.Image) *image.RGBA {
+	// El radio será la mitad del ancho o del alto, lo que sea menor
+	size := src.Bounds().Size()
+	r := min(size.X, size.Y) / 2
+	mask := image.NewRGBA(src.Bounds())
+
+	// Pintar la máscara de transparente
+	draw.Draw(mask, mask.Bounds(), image.Transparent, image.Point{}, draw.Src)
+
+	// Dibujar un círculo blanco en la máscara
+	for y := -r; y < r; y++ {
+		for x := -r; x < r; x++ {
+			if x*x+y*y <= r*r {
+				mask.Set(size.X/2+x, size.Y/2+y, color.Opaque)
+			}
+		}
+	}
+
+	// Crear la imagen final con el perfil redondeado
+	dst := image.NewRGBA(src.Bounds())
+	draw.DrawMask(dst, dst.Bounds(), src, image.Point{}, mask, image.Point{}, draw.Over)
+	return dst
+}
+
+func LoadFont(variant string) (font.Face, *truetype.Font, error) {
 	var file string
 	switch variant {
 	case "Black", "BlackItalic", "Bold", "BoldItalic", "Italic", "Light", "LightItalic", "Medium", "MediumItalic", "Regular", "Thin", "ThinItalic":
 		file = fmt.Sprintf("assets/fonts/Roboto-%s.ttf", variant)
 	default:
 		log.Println("No font provided or found")
-		return nil, fmt.Errorf("No font provided or found")
+		return nil, nil, fmt.Errorf("No font provided or found")
 	}
 	fontBytes, err := os.ReadFile(file)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	fontParsed, err := truetype.Parse(fontBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return fontParsed, nil
+	fontFace := truetype.NewFace(fontParsed, &truetype.Options{
+		Size:    24,
+		DPI:     72,
+		Hinting: font.HintingNone,
+	})
+
+	return fontFace, fontParsed, nil
 }
 
 func drawText(img *image.RGBA, fnt *truetype.Font, text string, position image.Point, clr color.Color) {
@@ -64,7 +125,7 @@ func createInitialsImage(name string) *image.RGBA {
 	draw.Draw(img, img.Bounds(), &image.Uniform{bgColor}, image.Point{}, draw.Src)
 
 	// Load the font
-	fnt, err := LoadFont("Regular") // Assuming LoadFont can handle "Regular"
+	_, fnt, err := LoadFont("Regular") // Assuming LoadFont can handle "Regular"
 	if err != nil {
 		log.Println("Failed to load font:", err)
 		return img
@@ -80,50 +141,16 @@ func createInitialsImage(name string) *image.RGBA {
 	return img
 }
 
-func drawRoundedRectangle(img *image.RGBA, rect image.Rectangle, clr color.Color, radius int) {
-	// Create a mask image to draw rounded corners
-	mask := image.NewRGBA(img.Bounds())
-	draw.Draw(mask, mask.Bounds(), &image.Uniform{color.Transparent}, image.Point{}, draw.Src)
+func drawRoundedRectangle(dst *image.RGBA, r image.Rectangle, clr color.Color, radius int) {
+	// Rellena el centro
+	fill := image.NewUniform(clr)
+	draw.Draw(dst, image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Max.Y), fill, image.Point{}, draw.Src)
 
-	// Define the corner arc
-	quarterCircle := func(r int) []image.Point {
-		points := []image.Point{}
-		for y := -r; y <= r; y++ {
-			for x := -r; x <= r; x++ {
-				if x*x+y*y <= r*r {
-					points = append(points, image.Point{x, y})
-				}
-			}
-		}
-		return points
-	}(radius)
-
-	// Draw four corners
-	corners := []image.Point{
-		rect.Min,
-		image.Pt(rect.Max.X-radius, rect.Min.Y),
-		image.Pt(rect.Min.X, rect.Max.Y-radius),
-		rect.Max.Sub(image.Pt(radius, radius)),
-	}
-
-	for _, corner := range corners {
-		for _, p := range quarterCircle {
-			mask.Set(corner.X+p.X, corner.Y+p.Y, clr)
-		}
-	}
-
-	// Fill the centers
-	centerRects := []image.Rectangle{
-		image.Rect(rect.Min.X+radius, rect.Min.Y, rect.Max.X-radius, rect.Min.Y+radius), // Top
-		image.Rect(rect.Min.X, rect.Min.Y+radius, rect.Max.X, rect.Max.Y-radius),        // Center
-		image.Rect(rect.Min.X+radius, rect.Max.Y-radius, rect.Max.X-radius, rect.Max.Y), // Bottom
-	}
-	for _, r := range centerRects {
-		draw.Draw(mask, r, &image.Uniform{clr}, image.Point{}, draw.Src)
-	}
-
-	// Draw the mask onto the original image
-	draw.Draw(img, rect, mask, rect.Min, draw.Over)
+	// Rellena los lados rectos
+	draw.Draw(dst, image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y), fill, image.Point{}, draw.Src)
+	draw.Draw(dst, image.Rect(r.Min.X, r.Max.Y, r.Max.X, r.Max.Y), fill, image.Point{}, draw.Src)
+	draw.Draw(dst, image.Rect(r.Min.X, r.Min.Y, r.Min.X, r.Max.Y), fill, image.Point{}, draw.Src)
+	draw.Draw(dst, image.Rect(r.Max.X, r.Min.Y, r.Max.X, r.Max.Y), fill, image.Point{}, draw.Src)
 }
 
 func getInitials(name string) string {
@@ -160,48 +187,55 @@ func calculateTextWidth(text string, fnt *truetype.Font, fontSize float64) (int,
 }
 
 func GenerateImage(profileImg image.Image, name, message string) ([]byte, error) {
-	// Create a new image with a transparent background
-	rgba := image.NewRGBA(image.Rect(0, 0, 800, 200)) // Adjust dimensions as needed
+	// Cargar las fuentes
+	_, boldFontTtf, err := LoadFont("Bold")
+	if err != nil {
+		return nil, err
+	}
+	regularFont, regularFontTtf, err := LoadFont("Regular")
+	if err != nil {
+		return nil, err
+	}
 
-	var profileRect image.Rectangle
-	// Draw the profile image or initials image
-	// Asegúrate de que profileImg no sea nil
-	if profileImg != nil {
-		// Suponiendo que quieres la imagen de perfil en la esquina superior izquierda
-		profileRect = image.Rect(0, 0, profileImg.Bounds().Dx(), profileImg.Bounds().Dy())
-		draw.Draw(rgba, profileRect, profileImg, image.Point{}, draw.Over)
-	} else {
+	if profileImg == nil {
 		// Crea y dibuja la imagen de las iniciales si no hay imagen de perfil
-		profileImg := createInitialsImage(name)
-		profileRect = image.Rect(0, 0, profileImg.Bounds().Dx(), profileImg.Bounds().Dy())
-		draw.Draw(rgba, profileRect, profileImg, image.Point{}, draw.Over)
+		profileImg = roundProfileImage(createInitialsImage(name))
+	} else {
+		profileImg = roundProfileImage(profileImg)
 	}
 
-	boldFont, err := LoadFont("Bold")
-	if err != nil {
-		return nil, err
+	profileWidth := profileImg.Bounds().Dx()
+	profileRect := image.Rect(10, 10, 10+profileWidth, 190) // Padding de 10 píxeles
+	nameWidth, _ := calculateTextWidth(name, boldFontTtf, 24)
+	messageWidth, _ := calculateTextWidth(message, regularFontTtf, 24)
+
+	wrappedMessage := wrapText(message, 50, regularFont) // Dibujar la imagen de perfil
+	wrappedLen := len(wrappedMessage)
+
+	var totalWidth int
+	if len(message) > 40 {
+		totalWidth = profileRect.Max.X + 790
+	} else {
+		totalWidth = max(profileRect.Max.X+10+nameWidth, profileRect.Max.X+10+messageWidth) + 50
 	}
 
-	regularFont, err := LoadFont("Regular")
-	if err != nil {
-		return nil, err
-	}
+	totalHeight := ((3 + wrappedLen) * 27) + 20
 
-	messageWidth, err := calculateTextWidth(message, regularFont, 30)
+	rgba := image.NewRGBA(image.Rect(0, 0, totalWidth, max(totalHeight, 200)))
 
-	// Ajustar las posiciones de los recuadros basándose en las anchuras calculadas
-	nameBox := image.Rect(profileRect.Max.X+10, 5, profileRect.Max.X+10+messageWidth+20, 80)                   // +20 para el padding
-	messageBox := image.Rect(nameBox.Min.X, nameBox.Max.Y-10, nameBox.Min.X+messageWidth+20, nameBox.Max.Y+80) // +10 para espacio entre recuadros
+	draw.Draw(rgba, profileRect, profileImg, image.Point{}, draw.Over)
 
-	// Dibujar recuadro con bordes redondeados para el nombre
-	drawRoundedRectangle(rgba, nameBox, color.Black, 0) // Ajusta el color y radio según sea necesario
+	textBox := image.Rect(profileRect.Max.X+10, 10, totalWidth-10, max(totalHeight, 200)) // Dibujar el fondo con bordes redondeados
+	y := textBox.Min.Y + 24
+	drawRoundedRectangle(rgba, textBox, color.Black, 20)
 	// Dibujar el texto del nombre
-	drawText(rgba, boldFont, name, nameBox.Min.Add(image.Pt(10, 20)), color.White) // Ajusta el color y la posición según sea necesario
+	drawText(rgba, boldFontTtf, name, image.Pt(textBox.Min.X+10, y), color.White) // Ajusta el color y la posición según sea necesario
 
-	// Dibujar recuadro con bordes redondeados para el mensaje
-	drawRoundedRectangle(rgba, messageBox, color.Black, 0)
-	// Dibujar el mensaje
-	drawText(rgba, regularFont, message, messageBox.Min.Add(image.Pt(10, 20)), color.White) // Ajusta el color y la posición según sea necesario
+	y += 40
+	for _, line := range wrappedMessage {
+		drawText(rgba, regularFontTtf, line, image.Pt(textBox.Min.X+10, y), color.White)
+		y += 26
+	}
 
 	// Encode the image as PNG
 	buf := new(bytes.Buffer)

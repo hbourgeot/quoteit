@@ -13,7 +13,7 @@ import (
 	"os"
 
 	"github.com/hbourgeot/quoteme/tgbot"
-	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 func getImageFormat(r io.Reader) (string, error) {
@@ -93,14 +93,12 @@ func getImage(bot *tgbot.BotAPI, fileConf tgbot.FileConfig) image.Image {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("linea 47", err)
-	}
 	bot, err := tgbot.NewBotAPI(os.Getenv("TELEGRAM_BOT_URL"))
 	if err != nil {
 		log.Fatal("linea 51", err)
 	}
+
+	bot.Debug = true
 
 	updateConfig := tgbot.NewUpdate(0)
 	updateConfig.Timeout = 30
@@ -143,12 +141,12 @@ func main() {
 				log.Fatal("linea 89", err)
 			}
 
-			err = os.WriteFile("quote.png", imgBytes, 0644)
+			err = os.WriteFile("quote.webp", imgBytes, 0644)
 			if err != nil {
 				log.Fatal("linea 94", err)
 			}
 
-			stkConfig := tgbot.NewSticker(msg.Chat.ID, tgbot.FilePath("quote.png"))
+			stkConfig := tgbot.NewSticker(msg.Chat.ID, tgbot.FilePath("quote.webp"))
 
 			if _, err := bot.Send(stkConfig); err != nil {
 				log.Fatal("linea 100", err)
