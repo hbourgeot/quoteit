@@ -9,8 +9,7 @@ import (
 	"log"
 )
 
-func drawText(img *image.RGBA, fnt *truetype.Font, text string, position image.Point, clr color.Color) {
-	fontSize := 30.0
+func drawText(img *image.RGBA, fnt *truetype.Font, text string, position image.Point, clr color.Color, fontSize float64) {
 	// drawText draws the text on img using the provided font
 	// Set up freetype context with the font and draw the text
 	c := freetype.NewContext()
@@ -72,7 +71,7 @@ func createInitialsImage(name string) *image.RGBA {
 
 	// Draw the initials in the center of the image
 	pt := image.Pt(100/2-len(initials)*int(fontSize)/4, 100/2+int(fontSize)/2) // Centering logic
-	drawText(img, fnt, initials, pt, textColor)
+	drawText(img, fnt, initials, pt, textColor, fontSize)
 
 	return img
 }
