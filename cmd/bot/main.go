@@ -104,20 +104,32 @@ func main() {
 	updateConfig.Timeout = 30
 	updates := bot.GetUpdatesChan(updateConfig)
 
+	keyboard := tgbot.NewInlineKeyboardMarkup(
+		tgbot.NewInlineKeyboardRow(
+			tgbot.NewInlineKeyboardButtonData("👍", "vote_up"),
+			tgbot.NewInlineKeyboardButtonData("👎", "vote_down"),
+		),
+	)
+
 	for update := range updates {
 		if update.Message == nil || !update.Message.IsCommand() && update.Message.ReplyToMessage == nil {
 			continue
 		}
 
 		cmd := update.Message.Command()
-		msg := update.Message
-
-		personQuote := msg.ReplyToMessage.From
-		photosConf := tgbot.NewUserProfilePhotos(personQuote.ID)
 
 		switch cmd {
 		case "q":
 
+			msg := update.Message
+
+			if update.Message.ReplyToMessage == nil {
+				continue
+			}
+
+			personQuote := msg.ReplyToMessage.From.FirstName + " " + msg.ReplyToMessage.From.LastName
+			personQuoteID := msg.ReplyToMessage.From.ID
+			photosConf := tgbot.NewUserProfilePhotos(personQuoteID)
 			photos, err := bot.GetUserProfilePhotos(photosConf)
 			if err != nil {
 				log.Fatal("linea 76", err)
@@ -136,7 +148,7 @@ func main() {
 				continue
 			}
 
-			imgBytes, err := generators.GenerateImage(profileImg, personQuote.FirstName+" "+personQuote.LastName, msg.ReplyToMessage.Text)
+			imgBytes, err := generators.GenerateImage(profileImg, personQuote, msg.ReplyToMessage.Text)
 			if err != nil {
 				log.Fatal("linea 89", err)
 			}
@@ -147,6 +159,8 @@ func main() {
 			}
 
 			stkConfig := tgbot.NewSticker(msg.Chat.ID, tgbot.FilePath("quote.webp"))
+			stkConfig.ReplyMarkup = keyboard
+			stkConfig.ReplyToMessageID = msg.MessageID
 
 			if _, err := bot.Send(stkConfig); err != nil {
 				log.Fatal("linea 100", err)

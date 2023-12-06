@@ -33,10 +33,12 @@ func GenerateImage(profileImg image.Image, name, message string) ([]byte, error)
 
 	wrappedMessage := wrapText(message, 50, regularFont) // Dibujar la imagen de perfil
 	wrappedLen := len(wrappedMessage)
+	fontSize := 30.0
 
 	var totalWidth int
 	if len(message) > 40 {
-		totalWidth = profileRect.Max.X + 790
+		fontSize = 20
+		totalWidth = profileRect.Max.X + 550
 	} else {
 		totalWidth = max(profileRect.Max.X+10+nameWidth, profileRect.Max.X+10+messageWidth) + 50
 	}
@@ -51,11 +53,11 @@ func GenerateImage(profileImg image.Image, name, message string) ([]byte, error)
 	y := textBox.Min.Y + 24
 	drawRoundedRectangle(rgba, textBox, color.Black, 20)
 	// Dibujar el texto del nombre
-	drawText(rgba, boldFontTtf, name, image.Pt(textBox.Min.X+10, y), color.White) // Ajusta el color y la posición según sea necesario
+	drawText(rgba, boldFontTtf, name, image.Pt(textBox.Min.X+10, y), color.White, fontSize) // Ajusta el color y la posición según sea necesario
 
 	y += 40
 	for _, line := range wrappedMessage {
-		drawText(rgba, regularFontTtf, line, image.Pt(textBox.Min.X+10, y), color.White)
+		drawText(rgba, regularFontTtf, line, image.Pt(textBox.Min.X+10, y), color.White, fontSize)
 		y += 26
 	}
 
