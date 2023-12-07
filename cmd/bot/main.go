@@ -14,7 +14,7 @@ func main() {
 		log.Fatal("linea 51", err)
 	}
 
-	bot.Debug = true
+	//bot.Debug = true
 
 	updateConfig := tgbot.NewUpdate(0)
 	updateConfig.Timeout = 30

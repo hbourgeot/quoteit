@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/hbourgeot/quoteme/generators"
 	"github.com/hbourgeot/quoteme/tgbot"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func generateQuote(bot *tgbot.BotAPI, update tgbot.Update) error {
@@ -16,6 +19,14 @@ func generateQuote(bot *tgbot.BotAPI, update tgbot.Update) error {
 	)
 
 	msg := update.Message
+
+	var count int
+	if strings.Contains(msg.Text, " ") {
+		count, _ = strconv.Atoi(strings.Split(msg.Text, " ")[1])
+	} else {
+		count = 1
+	}
+	fmt.Println(count)
 
 	personQuote := msg.ReplyToMessage.From.FirstName + " " + msg.ReplyToMessage.From.LastName
 	personQuoteID := msg.ReplyToMessage.From.ID
