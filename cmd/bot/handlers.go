@@ -21,12 +21,19 @@ func generateQuote(bot *tgbot.BotAPI, update tgbot.Update) error {
 	msg := update.Message
 
 	var count int
+	//var messages []string
+
+	//initialMessage := msg.MessageID
+
 	if strings.Contains(msg.Text, " ") {
 		count, _ = strconv.Atoi(strings.Split(msg.Text, " ")[1])
 	} else {
 		count = 1
 	}
-	fmt.Println(count)
+
+	if count > 1 {
+		fmt.Println("wiiiiii")
+	}
 
 	personQuote := msg.ReplyToMessage.From.FirstName + " " + msg.ReplyToMessage.From.LastName
 	personQuoteID := msg.ReplyToMessage.From.ID

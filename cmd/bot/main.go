@@ -1,8 +1,10 @@
 package main
 
 import (
+	"github.com/celestix/gotgproto"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/hbourgeot/quoteme/tgbot"
 	_ "github.com/joho/godotenv/autoload"
@@ -14,7 +16,14 @@ func main() {
 		log.Fatal("linea 51", err)
 	}
 
-	//bot.Debug = true
+	clientType := gotgproto.ClientType{
+		BotToken: os.Getenv("TELEGRAM_BOT_URL"),
+	}
+
+	appId, _ := strconv.Atoi(os.Getenv("APP_ID"))
+	apiHash := os.Getenv("API_HASH")
+
+	client, err := gotgproto.NewClient(appId, apiHash, clientType, &gotgproto.ClientOpts{})
 
 	updateConfig := tgbot.NewUpdate(0)
 	updateConfig.Timeout = 30
