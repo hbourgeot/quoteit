@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/hbourgeot/quoteme/generators"
+	"github.com/hbourgeot/quoteme/tdlib"
 	"github.com/hbourgeot/quoteme/tgbot"
 	"log"
 	"os"
@@ -23,7 +23,7 @@ func generateQuote(bot *tgbot.BotAPI, update tgbot.Update) error {
 	var count int
 	//var messages []string
 
-	//initialMessage := msg.MessageID
+	initialMessage := msg.ReplyToMessage.MessageID
 
 	if strings.Contains(msg.Text, " ") {
 		count, _ = strconv.Atoi(strings.Split(msg.Text, " ")[1])
@@ -32,7 +32,15 @@ func generateQuote(bot *tgbot.BotAPI, update tgbot.Update) error {
 	}
 
 	if count > 1 {
-		fmt.Println("wiiiiii")
+		var messagesIDs []int
+		for i := 1; i <= count; i++ {
+			messagesIDs = append(messagesIDs, initialMessage)
+			initialMessage++
+		}
+
+		if err := tdlib.GetMessages(messagesIDs); err != nil {
+			return err
+		}
 	}
 
 	personQuote := msg.ReplyToMessage.From.FirstName + " " + msg.ReplyToMessage.From.LastName
